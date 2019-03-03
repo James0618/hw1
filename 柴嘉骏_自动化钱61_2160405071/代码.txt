@@ -1,0 +1,196 @@
+Parsing.py
+# -*- coding: UTF-8 -*-
+from struct import unpack
+
+
+# 读取并存储 bmp 文件
+class ReadBMPFile:
+    def __init__(self, filePath):
+        with open(filePath, "rb") as file:
+            # 读取 bmp 文件的文件头    14 字节
+            self.bfType = str(file.read(2), encoding="utf-8")  # 0x4d42 对应BM 表示这是Windows支持的位图格式
+            self.bfSize = unpack("<i", file.read(4))[0]  # 位图文件大小
+            self.bfReserved1 = unpack("<h", file.read(2))[0]  # 保留字段 必须设为 0
+            self.bfReserved2 = unpack("<h", file.read(2))[0]  # 保留字段 必须设为 0
+            self.bfOffBits = unpack("<i", file.read(4))[0]  # 偏移量 从文件头到位图数据需偏移多少字节（位图信息头、调色板长度等不是固定的，这时就需要这个参数了）
+            # 读取 bmp 文件的位图信息头 40 字节
+            self.biSize = unpack("<i", file.read(4))[0]  # 所需要的字节数
+            self.biWidth = unpack("<i", file.read(4))[0]  # 图像的宽度 单位 像素
+            self.biHeight = unpack("<i", file.read(4))[0]  # 图像的高度 单位 像素
+            self.biPlanes = unpack("<h", file.read(2))[0]  # 说明颜色平面数 总设为 1
+            self.biBitCount = unpack("<h", file.read(2))[0]  # 说明比特数
+
+            self.biCompression = unpack("<i", file.read(4))[0]  # 图像压缩的数据类型
+            self.biSizeImage = unpack("<i", file.read(4))[0]  # 图像大小
+            self.biXPelsPerMeter = unpack("<i", file.read(4))[0]  # 水平分辨率
+            self.biYPelsPerMeter = unpack("<i", file.read(4))[0]  # 垂直分辨率
+            self.biClrUsed = unpack("<i", file.read(4))[0]  # 实际使用的彩色表中的颜色索引数
+            self.biClrImportant = unpack("<i", file.read(4))[0]  # 对图像显示有重要影响的颜色索引的数目
+
+    def print_information(self):
+        print("文件类型：", self.bfType
+              , "\n文件大小：", self.bfSize
+              , "\n偏移量：", self.bfOffBits
+              , "\n位图信息所需字数：", self.biSize
+              , "\n图像宽度：", self.biWidth
+              , "\n图像高度：", self.biHeight
+              , "\n单像素点比特数：", self.biBitCount
+              , "\n图像大小：", self.biSizeImage
+              # , "\n水平分辨率：", self.biXPelsPerMeter
+              # , "\n垂直分辨率：", self.biYPelsPerMeter
+              )
+
+
+if __name__ == '__main__':
+    filepath = '/home/hero/Documents/DIP-Homework/Homework1-2.22/Requirement/7.bmp'
+    test = '/home/hero/Documents/DIP-Homework/Homework1-2.22/Content/4.Zoom/nearest_elain1.bmp'
+    picture = ReadBMPFile(test)
+    picture.print_information()
+
+
+MeanStddv.py
+import cv2 as cv
+
+
+filepath = '/home/hero/Documents/DIP-Homework/Homework1-2.22/Requirement/lena.bmp'
+img = cv.imread(filepath, cv.IMREAD_GRAYSCALE)
+height, width = img.shape[0], img.shape[1]
+(mean, stddv) = cv.meanStdDev(img)
+print("Mean:{}\nStddv:{}".format(mean[0][0], stddv[0][0]**2))
+
+
+Descending.py
+import struct
+import math
+
+
+class Bmp:
+    def __init__(self, file_path, k):
+        self.__bitSize = 0  # pixels size
+        self.bits = []  # pixel array
+        file = open(file_path, 'rb')
+        # BmpFileHeader
+        self.bfType = file.read(2)
+        self.bfSize = file.read(4)
+        self.bfReserved1 = file.read(2)
+        self.bfReserved2 = file.read(2)
+        self.bfOffBits = file.read(4)
+        # BmpStructHeader
+        self.biSize = file.read(4)
+        self.biWidth = file.read(4)
+        self.biHeight = file.read(4)
+        self.biPlanes = file.read(2)
+        self.biBitCount = file.read(2)
+        # pixel size
+        self.__bitSize = (int.from_bytes(self.bfSize,
+                                         'little') -
+                          int.from_bytes(self.bfOffBits, 'little')) \
+                         // (int.from_bytes(self.biBitCount, 'little') // 8)
+        self.biCompression = file.read(4)
+        self.biSizeImage = file.read(4)
+        self.biXPelsPerMeter = file.read(4)
+        self.biYPelsPerMeter = file.read(4)
+        self.biClrUsed = file.read(4)
+        self.biClrImportant = file.read(4)
+        #  load pixel info
+        count = 0
+        color_number = 2**(8-k)
+        while count < self.__bitSize:
+            bit_count = 0
+            while bit_count < (int.from_bytes(self.biBitCount, 'little') // 8):
+                self.bits.append(math.floor(struct.unpack("<B", file.read(1))[0]/color_number)*color_number)
+                bit_count += 1
+            count += 1
+        file.close()
+
+    def generate(self, file_path):
+        file = open(file_path, 'wb+')
+        # reconstruct File Header
+        file.write(self.bfType)
+        file.write(self.bfSize)
+        file.write(self.bfReserved1)
+        file.write(self.bfReserved2)
+        file.write(self.bfOffBits)
+        # reconstruct bmp header
+        file.write(self.biSize)
+        file.write(self.biWidth)
+        file.write(self.biHeight)
+        file.write(self.biPlanes)
+        file.write(struct.pack("<h", 8))
+        file.write(self.biCompression)
+        file.write(self.biSizeImage)
+        file.write(self.biXPelsPerMeter)
+        file.write(self.biYPelsPerMeter)
+        file.write(self.biClrUsed)
+        file.write(self.biClrImportant)
+        # reconstruct pixels
+        for bit in self.bits:
+            # print(struct.pack("<B", bit))
+            file.write(struct.pack("<B", bit))
+        file.close()
+
+
+if __name__ == '__main__':
+    for i in range(1, 8):
+        lena = Bmp(file_path='/home/hero/Documents/DIP-Homework/Homework1-2.22/Requirement/lena.bmp', k=i)
+        lena.generate('/home/hero/Documents/DIP-Homework/Homework1-2.22/Content/2.lena/lena{}.bmp'.format(i))
+
+
+Zooming.py
+import cv2 as cv
+import os.path
+
+
+class Zooming:
+    def __init__(self, img_name, aim_height, aim_width):
+        self.filedirpath = '/home/hero/Documents/DIP-Homework/Homework1-2.22/'
+        self.img_name = img_name
+        self.img = cv.imread(os.path.join(self.filedirpath, 'Requirement/{}.bmp'.format(self.img_name)), cv.IMREAD_GRAYSCALE)
+        self.aim_height, self.aim_width = aim_height, aim_width
+
+    def generate(self):
+        img_linear = cv.resize(self.img, (self.aim_height, self.aim_width), cv.INTER_LINEAR)
+        img_nearest = cv.resize(self.img, (self.aim_height, self.aim_width), cv.INTER_NEAREST)
+        img_cubic = cv.resize(self.img, (self.aim_height, self.aim_width), cv.INTER_CUBIC)
+
+        cv.imwrite(os.path.join(self.filedirpath, 'Content/4.Zoom/nearest_{}.bmp'.format(self.img_name)), img_nearest)
+        cv.imwrite(os.path.join(self.filedirpath, 'Content/4.Zoom/linear_{}.bmp'.format(self.img_name)), img_linear)
+        cv.imwrite(os.path.join(self.filedirpath, 'Content/4.Zoom/cubic_{}.bmp'.format(self.img_name)), img_cubic)
+
+
+if __name__ == '__main__':
+    img_names = ['lena', 'elain1']
+    for img_name in img_names:
+        lena = Zooming(img_name, 2048, 2048)
+        lena.generate()
+
+
+Transforming.py
+import Zooming
+import cv2 as cv
+import numpy as np
+
+
+elainpath = '/home/hero/Documents/DIP-Homework/Homework1-2.22/Requirement/elain1.bmp'
+lenapath = '/home/hero/Documents/DIP-Homework/Homework1-2.22/Requirement/lena.bmp'
+elain_img = cv.imread(elainpath, cv.IMREAD_GRAYSCALE)
+lena_img = cv.imread(lenapath, cv.IMREAD_GRAYSCALE)
+elain_height, elain_width = elain_img.shape[0], elain_img.shape[1]
+lena_height, lena_width = lena_img.shape[0], lena_img.shape[1]
+
+matrix = cv.getRotationMatrix2D((elain_height/2, elain_width/2), 30, 0.5)  # 获得旋转变换矩阵
+point1 = np.float32([[0, 511], [256, 511], [0, 256]])          # 三角形顶点
+point2 = np.float32([[208, 383], [336, 384], [134, 256]])
+shear = cv.getAffineTransform(point1, point2)
+
+rotated_img = cv.warpAffine(elain_img, matrix, (elain_height, elain_width))
+sheared_img = cv.warpAffine(lena_img, shear, (lena_height, lena_width))
+
+cv.imwrite('/home/hero/Documents/DIP-Homework/Homework1-2.22/Requirement/rotated_elain1.bmp', rotated_img)
+elain = Zooming.Zooming('rotated_elain1', 2048, 2048)
+elain.generate()
+
+cv.imwrite('/home/hero/Documents/DIP-Homework/Homework1-2.22/Requirement/sheared_lena.bmp', sheared_img)
+lena = Zooming.Zooming('sheared_lena', 2048, 2048)
+lena.generate()
+
